@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        #chat { 
+            border: 1px solid #ccc; 
+            height: 300px; 
+            overflow-y: scroll; 
+            margin-bottom: 10px; 
+            padding: 10px; 
+        }
+        #message { width: calc(100% - 70px); }
+        .input-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+        }
+        @media (max-width: 600px) {
+            #chat { height: 200px; }
+            #message { width: calc(100% - 90px); }
+            button { width: 50px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Chat</h1>
+    <input type="text" id="username" placeholder="Enter your username">
+    <div id="chat"></div>
+    <div id="typing" style="font-style: italic; color: grey;"></div>
+    <div class="input-container">
+        <input type="text" id="message" placeholder="Type a message">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        const ws = new WebSocket('ws://192.168.1.9:3000');  // Replace with your server's IP address
+        let username = '';
+        let typingTimeout;
+
+        document.getElementById('username').addEventListener('change', (event) => {
+            username = event.target.value;
+            const usernameMessage = JSON.stringify({
+                type: 'username',
+                username: username,
+            });
+            ws.send(usernameMessage);
+        });
+
+        document.getElementById('message').addEventListener('input', () => {
+            clearTimeout(typingTimeout);
+            const typingMessage = JSON.stringify({
+                type: 'typing',
+            });
+            ws.send(typingMessage);
+
+            typingTimeout = setTimeout(() => {
+                const stopTypingMessage = JSON.stringify({
+                    type: 'typing',
+                    stop: true,
+                });
+                ws.send(stopTypingMessage);
+            }, 1000);
+        });
+
+        ws.onmessage = (event) => {
+            const chat = document.getElementById('chat');
+            const typing = document.getElementById('typing');
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'message') {
+                const message = document.createElement('div');
+                message.textContent = `${data.username || data.userId}: ${data.text}`;
+                chat.appendChild(message);
+                chat.scrollTop = chat.scrollHeight;
+            } else if (data.type === 'typing') {
+                if (data.stop) {
+                    typing.textContent = '';
+                } else {
+                    typing.textContent = `${data.username || data.userId} is typing...`;
+                }
+            }
+        };
+
+        function sendMessage() {
+            const input = document.getElementById('message');
+            const message = JSON.stringify({
+                type: 'message',
+                text: input.value,
+            });
+            ws.send(message);
+            input.value = '';
+        }
+    </script>
+</body>
+</html>
